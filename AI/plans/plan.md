@@ -70,14 +70,16 @@ Single question: **"How did this workout feel?"**
 
 ---
 
-## Views (6 total)
+## Views (8 total)
 
 1. **Setup** — FTP, VT1, VT2, max HR, custom zones
-2. **Workout Planner** — NLP → Claude → visual step preview → start
-3. **Workout Execution** — compact live view with real-time chart
-4. **Post-Session** — survey + Strava export
-5. **Calendar** — workout history by date, click to view summary
-6. **Library** — saved/named workouts for re-use, click to load into planner
+2. **Workout Planner** — two modes: (a) single workout via NLP → preview → start/schedule; (b) multi-week training plan via NLP → week-by-week preview → schedule all to calendar
+3. **Workout Editor** — fine-tune a generated or loaded workout step-by-step before executing or saving
+4. **Workout Execution** — compact live view with real-time chart
+5. **Post-Session** — survey + Strava export
+6. **Calendar** — workout history (past) + scheduled workouts (future); NLP scheduling interface
+7. **Library** — saved/named workouts for re-use, click to load into planner or editor
+8. **Device Setup** — BLE pairing for trainer, HR monitor, cadence sensor (split from Setup for clarity)
 
 ---
 
@@ -106,10 +108,39 @@ Single question: **"How did this workout feel?"**
 - Setup view includes a device pairing screen to scan and save the BLE addresses of trainer, HR monitor, and cadence sensor
 
 ### Phase 4 — Workout Planning View
+
+The Planner handles two distinct modes, selectable by the user:
+
+#### Single Workout Mode
 - Text input + "Generate" button
 - Claude API call with system prompt defining the workout JSON schema
 - Stream response; parse JSON on completion
 - Render workout as visual block list (watts + duration)
+- "Edit Workout", "Save to Library", "Start Workout", and "Schedule" buttons
+- "Schedule" → date picker → saves as a planned entry in `sqflite`
+
+#### Training Plan Mode
+- Text input for multi-week goals, e.g. "four-week aerobic base building phase" or "six weeks to increase my FTP"
+- Claude receives: goal, available days per week (asked if not stated in the prompt), and today's date
+- Returns a structured training plan: an ordered list of weeks, each containing named workout entries assigned to specific days
+- Each workout entry in the plan uses the same `Workout` JSON schema (so they are immediately executable)
+- Plan is rendered as a week-by-week overview: week number, goal/focus label, list of workouts with day, name, duration, and intensity summary
+- "Schedule All" — bulk-writes every workout to `planned_workouts` in `sqflite` on the correct dates, populating the Calendar
+- Individual workouts in the plan can be tapped to preview, edit, or reschedule before committing
+- "Save Plan" — stores the whole plan as a named entity in a `training_plans` table for reference
+
+**Claude system prompt for plan mode** must include:
+- Today's date (so Claude assigns absolute calendar dates to each workout)
+- User's FTP, VT1, VT2, and max HR read from `settingsProvider` — injected into the system prompt so intensity targets come back as real watts, not vague % FTP descriptions
+- The workout JSON schema and the constraint that every workout must be parseable by the app
+- Instruction to respect the progressive overload principle and include rest/recovery days
+
+### Phase 4b — Workout Editor View
+- Editable list of workout steps (add, remove, reorder)
+- Each step: type selector (SteadyState / Interval / Ramp), duration, power target (watts or % FTP)
+- Interval block: reps + on/off sub-steps inline
+- Live preview updates as edits are made (same visual block format as Planner)
+- Accessed from Planner ("Edit Workout") or Library (tap → edit)
 - "Save to Library" and "Start Workout" buttons
 
 ### Phase 5 — Workout Execution View
@@ -129,8 +160,13 @@ Single question: **"How did this workout feel?"**
 - Workout saved to `sqflite`
 
 ### Phase 7 — Calendar View
-- Month grid view showing days with completed workouts
-- Click day → summary card (duration, avg power, survey response)
+- Month grid view showing both completed workouts (past) and planned workouts (future)
+  - Past days: colored dot → tap → summary card (duration, avg power, survey response)
+  - Future days: outlined dot → tap → planned workout card with "Edit" and "Start" shortcuts
+- NLP scheduling interface: text input ("easy 45 min zone 2 on Thursday") → Claude generates workout → saved as planned entry for that date
+  - Claude resolves relative dates ("Thursday", "next week") to absolute dates
+  - Generated workout flows through the same JSON schema as the Planner view
+- Planned entries stored in `sqflite` with a `planned_workouts` table (date, workout JSON, name)
 - Data from `sqflite`
 
 ### Phase 8 — Library View
