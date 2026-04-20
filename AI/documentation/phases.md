@@ -5,7 +5,7 @@
 | 1 | Project Scaffold | ✅ Complete |
 | 2 | Setup View | ✅ Complete |
 | 3 | BLE / Trainer Service | 🔲 Not started |
-| 4 | Workout Planning View | 🔲 Not started |
+| 4 | Workout Planning View | ✅ Complete |
 | 4b | Workout Editor View | 🔲 Not started |
 | 5 | Workout Execution View | 🔲 Not started |
 | 6 | Post-Session View | 🔲 Not started |
@@ -43,9 +43,23 @@
 - Auto-reconnect on disconnect
 - Device pairing UI added to Setup view (scan + save BLE addresses)
 
-## Phase 4 — Workout Planning View 🔲
+## Phase 4 — Workout Planning View ✅
 
 See [views.md](views.md) — Planner section.
+
+### What was built
+- `models/training_plan.dart` — `PlannedEntry`, `TrainingPlan` (with `byWeekNumber` grouping)
+- `services/api_key_service.dart` — reads/writes Claude API key to `%APPDATA%\smart_trainer\api_key` via `path_provider`
+- `services/database_service.dart` — SQLite (via `sqflite_common_ffi` FFI on Windows) with `planned_workouts` and `library_workouts` tables
+- `services/claude_service.dart` — `dio`-based Claude API; single workout and training plan modes; strips markdown code fences from responses
+- `providers/planner_provider.dart` — `PlannerState` + `PlannerNotifier`; mode toggle, generate, schedule, save to library
+- `views/setup/setup_view.dart` — API key field added (show/hide toggle, saved alongside other settings)
+- `views/planner/planner_view.dart` — full UI: mode toggle, NLP prompt input, block chart (`CustomPainter`, zone-coloured), step list, Schedule date picker, Save to Library, Edit (stub → Phase 4b), Start (stub → Phase 5)
+- `workout.dart` — `fromJson`/`toJson` added to all model classes
+
+### Dependency notes
+- `flutter_secure_storage` was evaluated but requires Visual Studio ATL which is not installed. Key stored in plain file in user AppData instead. Install ATL later to upgrade.
+- `sqflite_common_ffi` initialised in `main.dart` before `runApp`.
 
 ## Phase 4b — Workout Editor View 🔲
 

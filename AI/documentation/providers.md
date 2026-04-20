@@ -47,6 +47,66 @@ await ref.read(settingsProvider.notifier).save(newSettings);
 
 ---
 
+---
+
+## `plannerProvider` — `providers/planner_provider.dart`
+
+```dart
+final plannerProvider = NotifierProvider<PlannerNotifier, PlannerState>(PlannerNotifier.new);
+```
+
+### PlannerState
+
+| Field | Type | Description |
+|---|---|---|
+| `mode` | `PlannerMode` | `singleWorkout` or `trainingPlan` |
+| `isLoading` | `bool` | True while awaiting Claude API response |
+| `workout` | `Workout?` | Generated workout (single workout mode) |
+| `plan` | `TrainingPlan?` | Generated plan (training plan mode) |
+| `error` | `String?` | User-facing error message |
+
+### PlannerNotifier methods
+
+| Method | Description |
+|---|---|
+| `setMode(PlannerMode)` | Resets state to idle with new mode |
+| `generate(String prompt)` | Reads API key + settings, calls `ClaudeService`, updates state |
+| `scheduleWorkout(Workout, DateTime)` | Writes one entry to `planned_workouts` via `DatabaseService` |
+| `scheduleAll(TrainingPlan)` | Bulk-writes all plan entries to `planned_workouts` |
+| `saveToLibrary(Workout)` | Writes to `library_workouts` via `DatabaseService` |
+
+---
+
+## `apiKeyServiceProvider` — `services/api_key_service.dart`
+
+```dart
+final apiKeyServiceProvider = Provider((_) => ApiKeyService());
+```
+
+Reads/writes the Claude API key to `%APPDATA%\smart_trainer\api_key` (plain file, user-account-scoped). Methods: `getApiKey()`, `setApiKey(String)`, `deleteApiKey()`.
+
+---
+
+## `databaseServiceProvider` — `services/database_service.dart`
+
+```dart
+final databaseServiceProvider = Provider((_) => DatabaseService());
+```
+
+Lazy-opens a `sqflite` database at `%APPDATA%\smart_trainer\smart_trainer.db` (via `sqflite_common_ffi` on Windows). Tables: `planned_workouts`, `library_workouts`. Methods: `insertPlannedWorkout`, `insertLibraryWorkout`.
+
+---
+
+## `claudeServiceProvider` — `services/claude_service.dart`
+
+```dart
+final claudeServiceProvider = Provider((_) => ClaudeService());
+```
+
+`dio`-based client for the Claude API (`claude-sonnet-4-6`). Strips markdown code fences before JSON parsing. Methods: `generateWorkout(...)`, `generateTrainingPlan(...)`.
+
+---
+
 ## Planned providers (Phase 3+)
 
 | Provider | Phase | Description |

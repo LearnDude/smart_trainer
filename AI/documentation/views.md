@@ -36,19 +36,34 @@ All views live in `smart_trainer/lib/views/`. The shell (`app_shell.dart`) hosts
 
 ---
 
-## PlannerView — `views/planner/planner_view.dart` 🔲 Placeholder
+## PlannerView — `views/planner/planner_view.dart` ✅ Complete
 
-Phase 4. Two modes (toggled by the user):
+Phase 4. Side-by-side layout: left input panel (340px fixed), right preview panel (expanded).
 
 **Single Workout Mode**
-- NLP text input → Claude API → `Workout` JSON → rendered as visual block list
-- Buttons: Edit Workout, Save to Library, Start Workout, Schedule (date picker → `sqflite`)
+- NLP text input → `PlannerNotifier.generate()` → Claude API → `Workout` → preview panel
+- Preview: workout name, total duration, `WorkoutBlockChart` (zone-coloured `CustomPainter`), step list
+- Buttons: Edit (stub → Phase 4b), Save to Library (`sqflite`), Start (stub → Phase 5), Schedule (date picker → `sqflite`)
 
 **Training Plan Mode**
 - NLP text input for multi-week goals (e.g. "4-week aerobic base")
-- Claude receives goal + days/week + today's date + FTP/VT1/VT2 from `settingsProvider`
-- Returns a list of `Workout` objects with assigned calendar dates
-- Buttons: Schedule All, Save Plan
+- Claude receives goal + today's date + FTP/VT1/VT2 from `settingsProvider`
+- Preview: plan name, total workout count, week-by-week `ExpansionTile` list with mini block charts
+- Buttons: Schedule All (bulk-writes all entries to `sqflite`), Save Plan (stub → Phase 7)
+
+**`WorkoutBlockChart`** — `CustomPainter` widget. Draws proportional-width blocks, height proportional to power vs FTP. Zone colours:
+
+| Zone | % FTP | Colour |
+|---|---|---|
+| Z1 | < 55% | Blue-grey `#546E7A` |
+| Z2 | 55–75% | Blue `#1565C0` |
+| Z3 | 75–90% | Green `#2E7D32` |
+| Z4 | 90–105% | Amber `#F57F17` |
+| Z5 | 105–120% | Orange `#E65100` |
+| Z6 | 120–150% | Red `#B71C1C` |
+| Z7 | > 150% | Purple `#4A148C` |
+
+Ramps are approximated as 20 equal-width segments graduating in colour.
 
 ---
 

@@ -9,7 +9,8 @@
 | BLE | `flutter_blue_plus` |
 | Charts | `fl_chart` |
 | HTTP / API | `dio` |
-| Local storage | `shared_preferences` (settings) + `sqflite` (workouts, history) |
+| Local storage | `shared_preferences` (settings) + `sqflite` via `sqflite_common_ffi` (workouts, history) |
+| API key storage | Plain file in `%APPDATA%\smart_trainer\api_key` via `path_provider` (user-account-scoped) |
 | LLM | Claude API (`claude-sonnet-4-6`) via `dio` |
 | Strava export | Strava API v3 — OAuth via system browser, FIT file upload |
 
@@ -17,18 +18,24 @@
 
 ```
 smart_trainer/lib/
-├── main.dart                  # App entry point, ProviderScope
-├── models/                    # Immutable data classes, no Flutter deps
+├── main.dart                      # App entry, ProviderScope, sqflite FFI init (Windows)
+├── models/                        # Immutable data classes, no Flutter deps
 │   ├── user_settings.dart
-│   └── workout.dart
-├── providers/                 # Riverpod providers
+│   ├── workout.dart               # WorkoutStep, Workout — full fromJson/toJson
+│   ├── training_plan.dart         # PlannedEntry, TrainingPlan
+│   └── device_info.dart           # (Phase 3)
+├── providers/                     # Riverpod providers
 │   ├── navigation_provider.dart
-│   └── settings_provider.dart
-├── services/                  # BLE, Claude API, Strava (Phase 3+)
+│   ├── settings_provider.dart
+│   └── planner_provider.dart      # PlannerState + PlannerNotifier
+├── services/                      # Stateless service classes exposed as Providers
+│   ├── api_key_service.dart       # Claude API key — file in %APPDATA%
+│   ├── database_service.dart      # sqflite — planned_workouts, library_workouts
+│   └── claude_service.dart        # dio-based Claude API client
 └── views/
-    ├── app_shell.dart         # NavigationRail shell
+    ├── app_shell.dart             # NavigationRail shell
     ├── setup/
-    ├── planner/
+    ├── planner/                   # ✅ Phase 4 complete
     ├── execution/
     ├── post_session/
     ├── calendar/

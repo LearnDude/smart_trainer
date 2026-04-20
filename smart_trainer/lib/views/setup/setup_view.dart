@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/user_settings.dart';
 import '../../providers/settings_provider.dart';
+import '../../services/api_key_service.dart';
 
 const _powerZoneLabels = [
   'Z1 — Active Recovery',
@@ -39,11 +40,14 @@ class _SetupViewState extends ConsumerState<SetupView> {
       List.generate(6, (_) => TextEditingController());
   final List<TextEditingController> _hrZoneCtrs =
       List.generate(4, (_) => TextEditingController());
+  final _apiKeyCtrl = TextEditingController();
 
   bool _useCustomPower = false;
   bool _useCustomHr = false;
   bool _initialized = false;
   bool _saving = false;
+  bool _apiKeyObscured = true;
+  bool _apiKeyInitialized = false;
 
   @override
   void dispose() {
@@ -57,7 +61,17 @@ class _SetupViewState extends ConsumerState<SetupView> {
     for (final c in _hrZoneCtrs) {
       c.dispose();
     }
+    _apiKeyCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadApiKey() async {
+    if (_apiKeyInitialized) return;
+    _apiKeyInitialized = true;
+    final key = await ref.read(apiKeyServiceProvider).getApiKey();
+    if (key != null && mounted) {
+      setState(() => _apiKeyCtrl.text = key);
+    }
   }
 
   void _populate(UserSettings s) {
@@ -136,6 +150,12 @@ class _SetupViewState extends ConsumerState<SetupView> {
     );
 
     await ref.read(settingsProvider.notifier).save(settings);
+
+    final apiKey = _apiKeyCtrl.text.trim();
+    if (apiKey.isNotEmpty) {
+      await ref.read(apiKeyServiceProvider).setApiKey(apiKey);
+    }
+
     if (!mounted) return;
     setState(() => _saving = false);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -152,6 +172,7 @@ class _SetupViewState extends ConsumerState<SetupView> {
       error: (e, _) => Center(child: Text('Error loading settings: $e')),
       data: (settings) {
         _populate(settings);
+        _loadApiKey();
         return _buildForm(context);
       },
     );
@@ -316,6 +337,32 @@ class _SetupViewState extends ConsumerState<SetupView> {
                 ),
               const SizedBox(height: 12),
             ],
+          ),
+
+          const SizedBox(height: 32),
+
+          Text('Claude API Key', style: theme.textTheme.titleLarge),
+          const SizedBox(height: 4),
+          Text(
+            'Required for workout generation. Stored in your user AppData folder.',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _apiKeyCtrl,
+            obscureText: _apiKeyObscured,
+            decoration: InputDecoration(
+              labelText: 'API Key',
+              hintText: 'sk-ant-...',
+              border: const OutlineInputBorder(),
+              isDense: true,
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _apiKeyObscured ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                ),
+                onPressed: () => setState(() => _apiKeyObscured = !_apiKeyObscured),
+              ),
+            ),
           ),
 
           const SizedBox(height: 32),

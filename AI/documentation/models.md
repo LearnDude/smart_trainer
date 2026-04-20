@@ -92,24 +92,54 @@ Workout({required String name, required List<WorkoutStep> steps})
 ```
 `totalDuration` computed property sums all steps including interval repetitions.
 
+### Serialisation
+
+All classes implement `toJson()` and `fromJson()`. `Workout` additionally provides `toJsonString()` / `fromJsonString(String)` for `sqflite` storage.
+
 ### JSON Schema (for Claude API)
 
-Claude generates workouts as JSON matching this structure. The app parses the JSON into these Dart objects before rendering or executing.
+Claude generates workouts as JSON matching this exact structure. `WorkoutStep.fromJson` and `PowerTarget.fromJson` parse it back into Dart objects.
 
 ```json
 {
   "name": "Over-Under 60",
   "steps": [
-    { "type": "steady", "duration_s": 600, "power_w": 150 },
+    {
+      "type": "steady_state",
+      "duration_seconds": 600,
+      "power": { "type": "watts", "value": 150 }
+    },
     {
       "type": "interval",
       "reps": 3,
-      "on":  { "duration_s": 240, "power_w": 280 },
-      "off": { "duration_s": 120, "power_w": 200 }
+      "on":  { "duration_seconds": 240, "power": { "type": "watts", "value": 280 } },
+      "off": { "duration_seconds": 120, "power": { "type": "ftp_percent", "value": 0.6 } }
     },
-    { "type": "ramp", "duration_s": 300, "from_w": 200, "to_w": 100 }
+    {
+      "type": "ramp",
+      "duration_seconds": 300,
+      "from": { "type": "ftp_percent", "value": 0.75 },
+      "to":   { "type": "watts", "value": 100 }
+    }
   ]
 }
 ```
 
-Power can also be expressed as `"power_pct": 0.95` (% FTP) in place of `"power_w"`.
+`power.type` is `"watts"` (absolute) or `"ftp_percent"` (value 0.0–2.0).
+
+---
+
+## TrainingPlan — `models/training_plan.dart`
+
+Holds a structured multi-week plan returned by Claude in Training Plan mode.
+
+### PlannedEntry
+```dart
+PlannedEntry({ required DateTime date, required Workout workout })
+```
+
+### TrainingPlan
+```dart
+TrainingPlan({ required String name, required List<PlannedEntry> entries })
+```
+`entries` is sorted by date ascending. `byWeekNumber` groups them into a `Map<int, List<PlannedEntry>>` where week 1 starts on the date of the first entry.
