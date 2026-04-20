@@ -1,13 +1,14 @@
+
 # Build Phases
 
 | Phase | Name | Status |
 |---|---|---|
 | 1 | Project Scaffold | ✅ Complete |
 | 2 | Setup View | ✅ Complete |
-| 3 | BLE / Trainer Service | 🔲 Not started |
+| 3 | BLE / Trainer Service | ✅ Complete |
 | 4 | Workout Planning View | ✅ Complete |
-| 4b | Workout Editor View | 🔲 Not started |
-| 5 | Workout Execution View | 🔲 Not started |
+| 4b | Workout Editor View | ✅ Complete |
+| 5 | Workout Execution View | ✅ Complete |
 | 6 | Post-Session View | 🔲 Not started |
 | 7 | Calendar View | 🔲 Not started |
 | 8 | Library View | 🔲 Not started |
@@ -61,7 +62,7 @@ See [views.md](views.md) — Planner section.
 - `flutter_secure_storage` was evaluated but requires Visual Studio ATL which is not installed. Key stored in plain file in user AppData instead. Install ATL later to upgrade.
 - `sqflite_common_ffi` initialised in `main.dart` before `runApp`.
 
-## Phase 4b — Workout Editor View 🔲
+## Phase 4b — Workout Editor View ✅
 
 - Editable step list (add, remove, reorder)
 - Step type selector: SteadyState / Interval / Ramp
@@ -69,9 +70,21 @@ See [views.md](views.md) — Planner section.
 - Live preview updates in real time
 - Accessed from Planner ("Edit Workout") or Library
 
-## Phase 5 — Workout Execution View 🔲
+## Phase 5 — Workout Execution View ✅
 
-See [views.md](views.md) — Execution section.
+### What was built
+- `models/flat_step.dart` — `FlatStep` (steady + ramp variants), `flattenWorkout(Workout, int ftp)` expands `IntervalBlock` into on/off pairs and resolves all `PowerTarget` to absolute watts
+- `providers/execution_provider.dart` — `ExecutionState` + `ExecutionNotifier`; state machine `idle → active → paused → complete`; `Timer.periodic` tick samples live power/HR from BLE stream providers, advances step index, sends ERG commands via `TrainerService.setTargetPower`; ramp steps re-send ERG every second
+- `widgets/execution_chart.dart` — `CustomPainter`; planned profile as dark-grey filled blocks (trapezoid for ramps), FTP reference dashed line, actual power as orange polyline, cursor as white dashed vertical line; full-session x-axis with cursor advancing left-to-right
+- `views/execution/execution_view.dart` — three states: idle placeholder, active/paused workout view (metrics row, chart, step progress bar, pause/resume/stop controls), completing spinner; `ref.listen` auto-navigates to PostSession on complete
+- `views/planner/planner_view.dart` — Start button wired: checks trainer connection, calls `executionProvider.notifier.startWorkout`, navigates to Execution view
+- `views/editor/editor_view.dart` — Start Workout button wired via `onStart` callback; pops editor route then navigates to Execution view
+
+### Behaviour notes
+- Pause drops ERG to 50W; resume restores target watts
+- Stop shows confirmation dialog, then navigates to Post-Session with partial data
+- Trainer must be connected (BLE) before Start is allowed; shows snackbar otherwise
+- `ExecutionState` retains `powerSamples` + `hrSamples` + `avgPower` + `avgHr` after complete for Phase 6 Post-Session to consume
 
 ## Phase 6 — Post-Session View 🔲
 

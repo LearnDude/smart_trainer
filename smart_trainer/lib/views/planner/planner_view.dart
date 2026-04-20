@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/training_plan.dart';
 import '../../models/workout.dart';
+import '../../providers/execution_provider.dart';
+import '../../providers/navigation_provider.dart';
 import '../../providers/planner_provider.dart';
 import '../../providers/settings_provider.dart';
+import '../../providers/trainer_provider.dart';
 import '../../widgets/workout_block_chart.dart';
 import '../editor/editor_view.dart';
 
@@ -250,9 +254,7 @@ class _WorkoutPreviewPanel extends ConsumerWidget {
               label: const Text('Save to Library'),
             ),
             OutlinedButton.icon(
-              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Workout execution coming in Phase 5')),
-              ),
+              onPressed: () => _startWorkout(context, ref, workout, ftp),
               icon: const Icon(Icons.play_circle_outline),
               label: const Text('Start'),
             ),
@@ -265,6 +267,23 @@ class _WorkoutPreviewPanel extends ConsumerWidget {
         ),
       ],
     );
+  }
+
+  Future<void> _startWorkout(
+      BuildContext context, WidgetRef ref, Workout workout, int ftp) async {
+    final conn = ref.read(trainerConnectionProvider).valueOrNull;
+    if (conn != BluetoothConnectionState.connected) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Trainer not connected — pair it in Setup first'),
+        ),
+      );
+      return;
+    }
+    await ref.read(executionProvider.notifier).startWorkout(workout, ftp);
+    if (!context.mounted) return;
+    ref.read(selectedViewProvider.notifier).state = AppView.execution;
   }
 
   Future<void> _pickDateAndSchedule(

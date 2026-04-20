@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/workout.dart';
+import '../../providers/execution_provider.dart';
+import '../../providers/navigation_provider.dart';
 import '../../providers/planner_provider.dart';
 import '../../providers/settings_provider.dart';
+import '../../providers/trainer_provider.dart';
 import '../../widgets/workout_block_chart.dart';
 
 class EditorView extends ConsumerStatefulWidget {
@@ -103,6 +107,28 @@ class _EditorViewState extends ConsumerState<EditorView> {
     }
   }
 
+  Future<void> _startWorkout() async {
+    final conn = ref.read(trainerConnectionProvider).valueOrNull;
+    if (conn != BluetoothConnectionState.connected) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Trainer not connected — pair it in Setup first'),
+        ),
+      );
+      return;
+    }
+    final ftp = ref.read(settingsProvider).maybeWhen(
+          data: (s) => s.ftp,
+          orElse: () => 0,
+        );
+    if (ftp == 0) return;
+    await ref.read(executionProvider.notifier).startWorkout(_workout, ftp);
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    ref.read(selectedViewProvider.notifier).state = AppView.execution;
+  }
+
   @override
   Widget build(BuildContext context) {
     final ftp = ref.watch(settingsProvider).maybeWhen(
@@ -134,6 +160,7 @@ class _EditorViewState extends ConsumerState<EditorView> {
               workout: _workout,
               ftp: ftp,
               onSaveToLibrary: _saveToLibrary,
+              onStart: _startWorkout,
             ),
           ),
         ],
@@ -339,11 +366,13 @@ class _PreviewPanel extends StatelessWidget {
     required this.workout,
     required this.ftp,
     required this.onSaveToLibrary,
+    required this.onStart,
   });
 
   final Workout workout;
   final int ftp;
   final VoidCallback onSaveToLibrary;
+  final VoidCallback onStart;
 
   @override
   Widget build(BuildContext context) {
@@ -378,10 +407,7 @@ class _PreviewPanel extends StatelessWidget {
               label: const Text('Save to Library'),
             ),
             FilledButton.icon(
-              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Workout execution coming in Phase 5')),
-              ),
+              onPressed: onStart,
               icon: const Icon(Icons.play_circle_outline),
               label: const Text('Start Workout'),
             ),
