@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../models/device_info.dart';
 import '../../models/user_settings.dart';
 import '../../providers/settings_provider.dart';
+import '../../providers/trainer_provider.dart';
 import '../../services/api_key_service.dart';
+import '../../services/hr_service.dart';
+import '../../services/trainer_service.dart';
+import 'device_scan_sheet.dart';
 
 const _powerZoneLabels = [
   'Z1 — Active Recovery',
@@ -367,6 +373,10 @@ class _SetupViewState extends ConsumerState<SetupView> {
 
           const SizedBox(height: 32),
 
+          _DevicesSection(),
+
+          const SizedBox(height: 32),
+
           SizedBox(
             height: 48,
             child: FilledButton(
@@ -385,6 +395,168 @@ class _SetupViewState extends ConsumerState<SetupView> {
     );
   }
 }
+
+// ── Devices sub-section ───────────────────────────────────────────────────────
+
+class _DevicesSection extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final pairedAsync = ref.watch(pairedDevicesProvider);
+    final trainerConn = ref.watch(trainerConnectionProvider).valueOrNull;
+    final hrConn = ref.watch(hrConnectionProvider).valueOrNull;
+
+    return ExpansionTile(
+      title: const Text('Devices'),
+      subtitle: const Text('Pair trainer and heart rate monitor via Bluetooth'),
+      children: [
+        pairedAsync.when(
+          loading: () => const Padding(
+            padding: EdgeInsets.all(16),
+            child: CircularProgressIndicator(),
+          ),
+          error: (e, _) => Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text('Error: $e'),
+          ),
+          data: (devices) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (devices.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: Text(
+                    'No devices paired yet.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.outline,
+                        ),
+                  ),
+                )
+              else
+                for (final device in devices)
+                  _PairedDeviceTile(
+                    device: device,
+                    connectionState: device.type == DeviceType.trainer
+                        ? trainerConn
+                        : hrConn,
+                    onForget: () => ref
+                        .read(pairedDevicesProvider.notifier)
+                        .removeDevice(device.id),
+                  ),
+              const SizedBox(height: 8),
+              if (devices.any((d) => d.type == DeviceType.trainer) ||
+                  devices.any((d) => d.type == DeviceType.heartRate))
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                  child: OutlinedButton(
+                    onPressed: () => _connectAll(ref, devices),
+                    child: const Text('Connect All'),
+                  ),
+                ),
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (!devices.any((d) => d.type == DeviceType.trainer))
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.directions_bike, size: 18),
+                        label: const Text('Add Trainer'),
+                        onPressed: () => _openScanSheet(
+                            context, ref, DeviceType.trainer),
+                      ),
+                    if (!devices.any((d) => d.type == DeviceType.heartRate))
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.favorite_outline, size: 18),
+                        label: const Text('Add HR Monitor'),
+                        onPressed: () => _openScanSheet(
+                            context, ref, DeviceType.heartRate),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _connectAll(WidgetRef ref, List<DeviceInfo> devices) {
+    for (final d in devices) {
+      switch (d.type) {
+        case DeviceType.trainer:
+          ref.read(trainerServiceProvider).connect(d.id);
+        case DeviceType.heartRate:
+          ref.read(hrServiceProvider).connect(d.id);
+        case DeviceType.cadence:
+          break;
+      }
+    }
+  }
+
+  void _openScanSheet(
+      BuildContext context, WidgetRef ref, DeviceType type) {
+    showModalBottomSheet<DeviceInfo>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => DeviceScanSheet(deviceType: type),
+    );
+  }
+}
+
+class _PairedDeviceTile extends StatelessWidget {
+  const _PairedDeviceTile({
+    required this.device,
+    required this.connectionState,
+    required this.onForget,
+  });
+
+  final DeviceInfo device;
+  final BluetoothConnectionState? connectionState;
+  final VoidCallback onForget;
+
+  @override
+  Widget build(BuildContext context) {
+    final connected =
+        connectionState == BluetoothConnectionState.connected;
+    final dotColor =
+        connected ? Colors.green : Theme.of(context).colorScheme.outline;
+
+    return ListTile(
+      leading: Icon(
+        device.type == DeviceType.trainer
+            ? Icons.directions_bike
+            : Icons.favorite_outline,
+        size: 20,
+      ),
+      title: Text(device.name),
+      subtitle: Text(device.type.name),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: dotColor,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 12),
+          TextButton(
+            onPressed: onForget,
+            child: const Text('Forget'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Metric field ──────────────────────────────────────────────────────────────
 
 class _MetricField extends StatelessWidget {
   const _MetricField({
