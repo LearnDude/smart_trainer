@@ -26,6 +26,26 @@ class ClaudeService {
     return Workout.fromJson(_extractJson(text));
   }
 
+  /// Returns the generated Workout and the resolved scheduled date.
+  Future<(Workout, DateTime)> generateScheduledWorkout({
+    required String apiKey,
+    required String prompt,
+    required UserSettings settings,
+    required DateTime today,
+  }) async {
+    final text = await _call(
+      apiKey: apiKey,
+      system: _scheduledWorkoutPrompt(settings, today),
+      message: prompt,
+      maxTokens: 2048,
+    );
+    final json = _extractJson(text);
+    final workout = Workout.fromJson(json);
+    final dateStr = json['scheduled_date'] as String?;
+    final date = dateStr != null ? DateTime.parse(dateStr) : today;
+    return (workout, date);
+  }
+
   Future<TrainingPlan> generateTrainingPlan({
     required String apiKey,
     required String prompt,
@@ -102,6 +122,23 @@ Athlete profile: FTP ${s.ftp}W${s.vt1 > 0 ? ', VT1 ${s.vt1}W' : ''}${s.vt2 > 0 ?
 Return ONLY a valid JSON object — no explanation, no markdown, no code fences:
 
 {"name":"string","steps":[
+  {"type":"steady_state","duration_seconds":integer,"power":{"type":"watts","value":integer}},
+  {"type":"interval","reps":integer,"on":<steady_state>,"off":<steady_state>},
+  {"type":"ramp","duration_seconds":integer,"from":<power>,"to":<power>}
+]}
+
+Power type is "watts" (absolute) or "ftp_percent" (0.0–2.0 range). Always include warmup and cooldown.''';
+
+  String _scheduledWorkoutPrompt(UserSettings s, DateTime today) => '''
+You are a cycling coach. Generate a structured indoor cycling workout as JSON, then schedule it.
+
+Athlete profile: FTP ${s.ftp}W${s.vt1 > 0 ? ', VT1 ${s.vt1}W' : ''}${s.vt2 > 0 ? ', VT2 ${s.vt2}W' : ''}${s.maxHr > 0 ? ', Max HR ${s.maxHr}bpm' : ''}. Today: ${today.toIso8601String().substring(0, 10)}.
+
+If the user mentions a date (e.g. "Thursday", "next Monday", "in 3 days"), resolve it to an absolute ISO date and include "scheduled_date": "YYYY-MM-DD". If no date is mentioned, use today.
+
+Return ONLY a valid JSON object — no explanation, no markdown, no code fences:
+
+{"scheduled_date":"YYYY-MM-DD","name":"string","steps":[
   {"type":"steady_state","duration_seconds":integer,"power":{"type":"watts","value":integer}},
   {"type":"interval","reps":integer,"on":<steady_state>,"off":<steady_state>},
   {"type":"ramp","duration_seconds":integer,"from":<power>,"to":<power>}

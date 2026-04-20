@@ -1,12 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
+import '../models/planned_workout.dart';
 import '../models/session_result.dart';
 import '../models/workout.dart';
 
 class DatabaseService {
   static const _dbName = 'smart_trainer.db';
-  static const _version = 2;
+  static const _version = 3;
 
   Database? _db;
 
@@ -24,6 +25,7 @@ class DatabaseService {
         if (oldVersion < 2) {
           await _createSessionResultsTable(db);
         }
+        // version 3: planned_workouts table already created in onCreate — no schema changes needed
       },
     );
   }
@@ -78,6 +80,22 @@ class DatabaseService {
       'name': workout.name,
       'workout_json': workout.toJsonString(),
     });
+  }
+
+  Future<int> insertPlannedWorkoutModel(PlannedWorkout pw) async {
+    final db = await _database;
+    return db.insert('planned_workouts', pw.toMap());
+  }
+
+  Future<List<PlannedWorkout>> queryAllPlannedWorkouts() async {
+    final db = await _database;
+    final rows = await db.query('planned_workouts', orderBy: 'date ASC');
+    return rows.map(PlannedWorkout.fromMap).toList();
+  }
+
+  Future<void> deletePlannedWorkout(int id) async {
+    final db = await _database;
+    await db.delete('planned_workouts', where: 'id = ?', whereArgs: [id]);
   }
 
   // ── library_workouts ──────────────────────────────────────────────────────
